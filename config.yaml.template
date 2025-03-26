@@ -1,0 +1,12 @@
+# 日志文件路径
+log:
+  - /var/log/nginx/access.log
+
+# 需要匹配的URL模式（支持通配符）
+patterns:
+  - /wp-admin/*
+  - *.php
+  - /api/*
+
+# 日志读取行数（默认1000行）
+log_lines: 1000
