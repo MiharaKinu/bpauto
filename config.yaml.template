@@ -5,8 +5,28 @@ log:
 # 需要匹配的URL模式（支持通配符）
 patterns:
   - /wp-admin/*
-  - *.php
-  - /api/*
+  - /wordpress/*
+  - /2018/*
+  - /2019/*
+  - /blog/*
+  - /cms//*
+  - /media/*
+  - /news/*
+  - /shop/*
+  - /site/*
+  - /sito/*
+  - /test/*
+  - /web/*
+  - /website/*
+  - /wp-includes/*
+  - /wp/*
+  - /wp1/*
+  - /wp2/*
+  - //wp-includes/*
+  - /contact*
+  - /contact-us*
+  - /.git/*
+  - /xmlrpc*
 
 # 日志读取行数（默认1000行）
 log_lines: 1000
