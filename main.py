@@ -32,7 +32,17 @@ def match_paths(entries, patterns):
     matched = set()
     for ip, path in entries:
         for pattern in patterns:
-            if fnmatch(path, pattern):
+            # 处理正则表达式规则
+            if pattern.startswith('/^/'): 
+                try:
+                    # 移除前缀 /^/ 并编译正则表达式
+                    regex_pattern = pattern[3:]
+                    if re.match(regex_pattern, path):
+                        matched.add((ip, path, pattern))
+                except re.error:
+                    continue
+            # 处理普通的通配符规则
+            elif fnmatch(path, pattern):
                 matched.add((ip, path, pattern))
     return matched
 
