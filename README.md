@@ -13,6 +13,7 @@
 - 支持重新执行数据库中的封禁操作
 - 支持实时监控日志文件变动
 - 提供UFW防火墙状态查看功能
+- 支持IP白名单功能，避免误封重要IP
 
 ## 安装说明
 ```bash
@@ -29,7 +30,10 @@ sudo usermod -aG sudo $(whoami)  # 授予UFW权限
 ```bash
 cp config.yaml.template config.yaml
 ```
-2. 编辑config.yaml配置日志路径和匹配规则
+2. 编辑config.yaml配置日志路径、匹配规则和IP白名单
+   - 配置`patterns`：设置需要匹配的URL模式
+   - 配置`whitelist`：添加不需要封禁的IP地址
+   - 配置`log`：设置需要监控的日志文件路径
 3. 运行封禁程序
 ```bash
 python main.py bp

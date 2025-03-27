@@ -66,6 +66,7 @@ def process_bans():
     
     log_paths: List[str] = config.get('log', [])
     patterns: List[str] = config.get('patterns', [])
+    whitelist: List[str] = config.get('whitelist', [])
     log_lines: int = config.get('log_lines', 5000)
 
     print("\033[36m[*] Reading logs...\033[0m")
@@ -93,10 +94,19 @@ def process_bans():
     print("\033[36m[*] Processing bans...\033[0m")
     banned_count = 0
     skipped_count = 0
+    whitelist_count = 0  # 新增：统计白名单跳过数量
     processed_ips = set()
+    whitelisted_ips = set()
     
     for ip, path, pattern in matched_entries:
         if ip in processed_ips:
+            continue
+            
+        if ip in whitelist:
+            if ip not in whitelisted_ips:
+                print(f"\033[33m[!] Skipping ban for whitelisted IP: {ip}\033[0m")
+                whitelisted_ips.add(ip)
+                whitelist_count += 1  # 新增：增加白名单计数
             continue
             
         if ip in ufw_bans:
@@ -122,6 +132,7 @@ def process_bans():
     print("\033[36m" + "="*50 + "\033[0m")
     print(f"\033[1m本次封禁：\033[32m{banned_count}\033[0m 个IP")
     print(f"\033[1m本次跳过：\033[33m{skipped_count}\033[0m 个IP")
+    print(f"\033[1m白名单跳过：\033[33m{whitelist_count}\033[0m 个IP")  # 新增：显示白名单跳过数量
     print("\033[36m" + "="*50 + "\033[0m")
 
 if __name__ == '__main__':

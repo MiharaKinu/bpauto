@@ -18,7 +18,7 @@ from main import extract_ip_and_path, match_paths, print_ban_info, load_config
 class LogFileHandler(FileSystemEventHandler):
     """处理日志文件变动的事件处理器"""
     
-    def __init__(self, log_file, patterns, db_client, ufw_client):
+    def __init__(self, log_file, patterns, db_client, ufw_client, config):
         self.log_file = log_file
         self.patterns = patterns
         self.db_client = db_client
@@ -34,6 +34,9 @@ class LogFileHandler(FileSystemEventHandler):
         else:
             print(f"\033[31m[!] 无法获取UFW封禁列表: {ufw_result}\033[0m")
             self.ufw_bans = set()
+        
+        # 添加白名单支持
+        self.whitelist = set(config.get('whitelist', []))
     
     def _get_file_size(self):
         """获取文件大小"""
@@ -103,12 +106,22 @@ class LogFileHandler(FileSystemEventHandler):
         """处理匹配的条目"""
         banned_count = 0
         skipped_count = 0
+        whitelist_count = 0
+        whitelisted_ips = set()
         
         print("\033[36m[*] 处理新的封禁...\033[0m")
         
         for ip, path, pattern in matched_entries:
             # 跳过已处理的IP
             if ip in self.processed_ips:
+                continue
+            
+            # 检查是否在白名单中
+            if ip in self.whitelist:
+                if ip not in whitelisted_ips:
+                    print(f"\033[33m[!] 跳过白名单中的IP: {ip}\033[0m")
+                    whitelisted_ips.add(ip)
+                    whitelist_count += 1
                 continue
                 
             # 检查IP是否已在UFW黑名单中
@@ -136,10 +149,11 @@ class LogFileHandler(FileSystemEventHandler):
             else:
                 print(f"\033[31m[!] 封禁IP失败 {ip}: {error}\033[0m")
         
-        if banned_count > 0 or skipped_count > 0:
+        if banned_count > 0 or skipped_count > 0 or whitelist_count > 0:
             print("\033[36m" + "="*50 + "\033[0m")
             print(f"\033[1m本次封禁：\033[32m{banned_count}\033[0m 个IP")
             print(f"\033[1m本次跳过：\033[33m{skipped_count}\033[0m 个IP")
+            print(f"\033[1m白名单跳过：\033[33m{whitelist_count}\033[0m 个IP")
             print("\033[36m" + "="*50 + "\033[0m")
 
 
@@ -175,7 +189,7 @@ class LogWatchdog:
                 continue
                 
             log_dir = os.path.dirname(log_path)
-            handler = LogFileHandler(log_path, patterns, self.db_client, self.ufw_client)
+            handler = LogFileHandler(log_path, patterns, self.db_client, self.ufw_client, self.config)
             self.handlers.append(handler)
             
             self.observer.schedule(handler, log_dir, recursive=False)

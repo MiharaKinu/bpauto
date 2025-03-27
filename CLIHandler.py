@@ -176,9 +176,19 @@ class CLIHandler:
         # 获取 UFW 中的 IP 列表
         ufw_ips = {ip[0] for ip in ufw_result}
         
+        # 获取白名单
+        from main import load_config
+        config = load_config()
+        whitelist = config.get('whitelist', [])
+        
         # 找出需要重新封禁的记录并获取详细信息
         bans_to_redo = []
         for ip, _ in db_bans:
+            # 检查IP是否在白名单中
+            if ip in whitelist:
+                print(f"\033[33m[!] 跳过白名单中的IP: {ip}\033[0m")
+                continue
+                
             if ip not in ufw_ips:
                 details = self.db_client.get_ip_details(ip)
                 if details:
