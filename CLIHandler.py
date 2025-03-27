@@ -29,6 +29,8 @@ class CLIHandler:
             return self.handle_clear()
         elif command == 'redo':  # 添加新命令
             return self.handle_redo()
+        elif command == 'watch':  # 添加自动监控命令
+            return self.handle_watch()
         elif command == 'help':
             self.print_help()
         else:
@@ -148,9 +150,15 @@ class CLIHandler:
         print("  \033[32munban\033[0m  解封指定 IP，用法：unban <ip>")
         print("  \033[32mclear\033[0m  清除所有封禁记录")
         print("  \033[32mredo\033[0m   重新执行数据库中的封禁")
+        print("  \033[32mwatch\033[0m  启动自动监控日志文件变动")
         print("  \033[32mhelp\033[0m   显示帮助信息\n")
 
 
+    def handle_watch(self) -> int:
+        """处理 watch 命令，启动自动监控"""
+        from autowatchdog import main as watchdog_main
+        return watchdog_main()
+        
     def handle_redo(self) -> int:
         """处理 redo 命令，重新执行封禁"""
         # 获取数据库中的所有 IP
