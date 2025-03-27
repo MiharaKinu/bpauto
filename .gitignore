@@ -14,5 +14,5 @@ ban_address.db
 
 dist/
 build/
-bpauto.spec
-main.spec
+*.spec
+

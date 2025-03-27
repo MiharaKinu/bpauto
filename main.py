@@ -10,7 +10,9 @@ from fnmatch import fnmatch
 from DatabaseClient import DatabaseClient
 
 def load_config(config_path='config.yaml'):
-    with open(config_path, 'r') as f:
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    config_file = os.path.join(script_dir, config_path)
+    with open(config_file, 'r') as f:
         return yaml.safe_load(f)
 
 def tail_logs(log_paths, lines=1000):
@@ -34,14 +36,19 @@ def match_paths(entries, patterns):
                 matched.add((ip, path, pattern))
     return matched
 
+def print_ban_info(ip: str, path: str, pattern: str) -> None:
+    """
+    以表格形式打印封禁信息
+    """
+    print("\033[32m+" + "="*50 + "+\033[0m")
+    print(f"\033[32m| IP地址: {ip:<42} |\033[0m")
+    print(f"\033[36m| 访问路径: {path:<40} |\033[0m")
+    print(f"\033[33m| 匹配规则: {pattern:<40} |\033[0m")
+    print("\033[32m+" + "="*50 + "+\033[0m")
+
 def process_bans():
     """
     核心封禁处理流程
-    
-    1. 加载配置文件
-    2. 读取并分析日志
-    3. 匹配异常访问模式
-    4. 执行封禁并保存记录
     """
     config = load_config()
     db_client = DatabaseClient()
@@ -49,7 +56,7 @@ def process_bans():
     
     log_paths: List[str] = config.get('log', [])
     patterns: List[str] = config.get('patterns', [])
-    log_lines: int = config.get('log_lines', 1000)
+    log_lines: int = config.get('log_lines', 5000)
 
     print("\033[36m[*] Reading logs...\033[0m")
     log_data = tail_logs(log_paths, log_lines)
@@ -57,6 +64,12 @@ def process_bans():
 
     print("\033[36m[*] Checking existing bans...\033[0m")
     existing_bans = {ip for ip, _ in db_client.get_existing_bans()}
+    # 获取UFW现有黑名单
+    success, ufw_result = ufw.get_banned_ips()
+    if not success:
+        print(f"\033[31m[!] Failed to get UFW bans: {ufw_result}\033[0m")
+        return
+    ufw_bans = {ip for ip, _ in ufw_result}
 
     new_ips = {ip for ip, _ in ip_path_entries if ip not in existing_bans}
     
@@ -69,11 +82,23 @@ def process_bans():
 
     print("\033[36m[*] Processing bans...\033[0m")
     banned_count = 0
+    skipped_count = 0
     processed_ips = set()
+    
     for ip, path, pattern in matched_entries:
         if ip in processed_ips:
             continue
-        print(f"\033[32m[+] Banning: {ip}\033[0m for path: {path}")
+            
+        if ip in ufw_bans:
+            print(f"\033[33m[!] Skipping UFW ban for existing IP: {ip}\033[0m")
+            if db_client.save_ban(ip, path, pattern):
+                skipped_count += 1
+                processed_ips.add(ip)
+            else:
+                print(f"\033[31m[!] Failed to save ban to database for IP: {ip}\033[0m")
+            continue
+            
+        print_ban_info(ip, path, pattern)
         success, error = ufw.ban_ip(ip)
         if success:
             if db_client.save_ban(ip, path, pattern):
@@ -86,6 +111,7 @@ def process_bans():
 
     print("\033[36m" + "="*50 + "\033[0m")
     print(f"\033[1m本次封禁：\033[32m{banned_count}\033[0m 个IP")
+    print(f"\033[1m本次跳过：\033[33m{skipped_count}\033[0m 个IP")
     print("\033[36m" + "="*50 + "\033[0m")
 
 if __name__ == '__main__':

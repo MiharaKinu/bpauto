@@ -44,6 +44,7 @@ python main.py bp
 - `python main.py clear` 清除所有封禁记录
 - `python main.py unban <IP>` 解封指定IP
 - `python main.py get <IP>` 获取指定IP的详细封禁信息
+- `python main.py redo` 重新执行数据库中的封禁
 
 ## UFW调试命令
 - `sudo ufw status` 查看当前UFW防火墙状态

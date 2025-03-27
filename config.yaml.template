@@ -28,5 +28,5 @@ patterns:
   - /.git/*
   - /xmlrpc*
 
-# 日志读取行数（默认1000行）
-log_lines: 1000
+# 日志读取行数（默认5000行）
+log_lines: 5000

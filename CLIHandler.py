@@ -2,6 +2,7 @@ from typing import Optional
 import sys
 from DatabaseClient import DatabaseClient
 from UFWClient import UFWClient
+from main import print_ban_info  # 添加导入
 
 class CLIHandler:
     def __init__(self):
@@ -26,6 +27,8 @@ class CLIHandler:
             return self.handle_get(args)
         elif command == 'clear': 
             return self.handle_clear()
+        elif command == 'redo':  # 添加新命令
+            return self.handle_redo()
         elif command == 'help':
             self.print_help()
         else:
@@ -41,10 +44,21 @@ class CLIHandler:
             return 1
             
         ip = args[2]
-        result = self.db_client.get_ip_details(ip)
 
+        success, ufw_result = self.ufw.get_banned_ips()
+        if not success:
+            print(f"\033[31m错误：无法获取 UFW 黑名单：{ufw_result}\033[0m")
+            return 1
+            
+        ip_in_ufw = any(banned_ip[0] == ip for banned_ip in ufw_result)
+        if not ip_in_ufw:
+            print(f"\n\033[33m⚠️  IP [{ip}] 不在 UFW 黑名单中\033[0m\n")
+            return 1
+
+        # 从数据库获取详细信息
+        result = self.db_client.get_ip_details(ip)
         if not result:
-            print(f"\n\033[33m⚠️  IP [{ip}] 不在封禁列表中\033[0m\n")
+            print(f"\n\033[33m⚠️  IP [{ip}] 在 UFW 黑名单中，但在数据库中未找到详细信息\033[0m\n")
             return 1
 
         ip_addr, access_path, patterns = result
@@ -133,4 +147,58 @@ class CLIHandler:
         print("  \033[32mget\033[0m    获取指定 IP 的详细信息，用法：get <ip>")
         print("  \033[32munban\033[0m  解封指定 IP，用法：unban <ip>")
         print("  \033[32mclear\033[0m  清除所有封禁记录")
+        print("  \033[32mredo\033[0m   重新执行数据库中的封禁")
         print("  \033[32mhelp\033[0m   显示帮助信息\n")
+
+
+    def handle_redo(self) -> int:
+        """处理 redo 命令，重新执行封禁"""
+        # 获取数据库中的所有 IP
+        db_bans = self.db_client.get_existing_bans()  # 获取完整的封禁信息
+        if not db_bans:
+            print("\n\033[33m⚠️  数据库中没有封禁记录\033[0m\n")
+            return 0
+    
+        # 获取 UFW 黑名单
+        success, ufw_result = self.ufw.get_banned_ips()
+        if not success:
+            print(f"\033[31m错误：无法获取 UFW 黑名单：{ufw_result}\033[0m")
+            return 1
+    
+        # 获取 UFW 中的 IP 列表
+        ufw_ips = {ip[0] for ip in ufw_result}
+        
+        # 找出需要重新封禁的记录并获取详细信息
+        bans_to_redo = []
+        for ip, _ in db_bans:
+            if ip not in ufw_ips:
+                details = self.db_client.get_ip_details(ip)
+                if details:
+                    bans_to_redo.append(details)
+        
+        if not bans_to_redo:
+            print("\n\033[32m✓ 所有数据库中的 IP 都已在 UFW 黑名单中\033[0m\n")
+            return 0
+    
+        total = len(bans_to_redo)
+        print(f"\n\033[1;36m🔄 开始重新封禁 (共 {total} 个 IP)\033[0m")
+        print("\033[36m" + "="*50 + "\033[0m")
+    
+        success_count = 0
+        for ip, path, pattern in bans_to_redo:
+            print(f"\033[1m[{success_count + 1}/{total}]\033[0m 正在处理:")
+            print_ban_info(ip, path, pattern)
+            success, error = self.ufw.ban_ip(ip)
+            if success:
+                print("\033[32m✓ 封禁成功\033[0m")
+                success_count += 1
+            else:
+                print(f"\033[31m✗ 封禁失败 ({error})\033[0m")
+            print()
+    
+        print("\033[36m" + "="*50 + "\033[0m")
+        print(f"\n\033[1m处理完成：\033[32m{success_count}\033[0m/\033[1m{total}\033[0m 个 IP 已重新封禁")
+        if success_count != total:
+            print(f"\033[31m{total - success_count} 个 IP 处理失败\033[0m")
+        print()
+        return 0

@@ -1,8 +1,10 @@
 import sqlite3
+import os
 
 class DatabaseClient:
     def __init__(self, db_path='ban_address.db'):
-        self.db_path = db_path
+        script_dir = os.path.dirname(os.path.abspath(__file__))
+        self.db_path = os.path.join(script_dir, db_path)
         self._initialize_db()
     
     def _initialize_db(self):
@@ -34,31 +36,6 @@ class DatabaseClient:
         conn.commit()
         conn.close()
         return True
-    
-    def get_banned_ips(self):
-        """Get all banned IPs from the database"""
-        conn = sqlite3.connect(self.db_path)
-        cursor = conn.cursor()
-        
-        cursor.execute("SELECT ip_addr FROM ban_address")
-        ips = [row[0] for row in cursor.fetchall()]
-        
-        conn.close()
-        return ips
-    
-    def clear_all_bans(self):
-        """Clear all bans from the database"""
-        conn = sqlite3.connect(self.db_path)
-        cursor = conn.cursor()
-        
-        cursor.execute("SELECT ip_addr FROM ban_address")
-        ips = [row[0] for row in cursor.fetchall()]
-        
-        cursor.execute("DELETE FROM ban_address")
-        conn.commit()
-        conn.close()
-        
-        return ips
     
     def check_ip_exists(self, ip):
         """检查指定 IP 是否在封禁列表中"""
@@ -94,3 +71,13 @@ class DatabaseClient:
         result = cursor.fetchone()
         conn.close()
         return result
+    
+    def get_all_banned_ips(self) -> list:
+        """获取所有被封禁的 IP 地址列表"""
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+        cursor.execute('SELECT ip_addr FROM ban_address')
+        result = [row[0] for row in cursor.fetchall()]
+        conn.close()
+        return result
+    
