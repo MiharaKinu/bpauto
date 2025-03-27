@@ -2,7 +2,7 @@ from typing import Optional
 import sys
 from DatabaseClient import DatabaseClient
 from UFWClient import UFWClient
-from main import print_ban_info  # 添加导入
+from main import print_ban_info
 
 class CLIHandler:
     def __init__(self):

@@ -8,11 +8,10 @@ import yaml
 from watchdog.observers import Observer
 from watchdog.events import FileSystemEventHandler, FileModifiedEvent
 from collections import defaultdict
-
-# 导入项目中的相关模块
 from UFWClient import UFWClient
 from DatabaseClient import DatabaseClient
-from main import extract_ip_and_path, match_paths, print_ban_info, load_config
+from utils import extract_ip_and_path, match_paths, print_ban_info, load_config
+import threading
 
 
 class LogFileHandler(FileSystemEventHandler):
@@ -161,7 +160,10 @@ class LogWatchdog:
     """日志文件监控守护进程"""
     
     def __init__(self, config_path='config.yaml'):
-        self.config = load_config(config_path)
+        # 移除对 load_config 的直接调用，改用 main.py 中的 load_config
+        self.config = load_config()
+        if self.config is None:
+            raise ValueError("无法加载配置文件")
         self.db_client = DatabaseClient()
         self.ufw_client = UFWClient(self.db_client)
         self.observer = Observer()
@@ -205,26 +207,44 @@ class LogWatchdog:
         
     def stop(self):
         """停止监控"""
-        self.observer.stop()
-        self.observer.join()
-        print("\033[36m[*] 监控守护进程已停止\033[0m")
+        try:
+            self.observer.stop()
+            self.observer.join(timeout=2)
+            if self.observer.is_alive():
+                print("\033[33m[!] 警告: 监控进程未能在预期时间内停止\033[0m")
+        except Exception as e:
+            print(f"\033[31m[!] 停止监控时发生错误: {str(e)}\033[0m")
+        finally:
+            print("\033[36m[*] 监控守护进程已停止\033[0m")
 
 
 def main():
     """主函数"""
-    watchdog = LogWatchdog()
-    if not watchdog.start():
-        return 1
-        
+    watchdog = None
     try:
+        watchdog = LogWatchdog()
+        if not watchdog.start():
+            return 1
+            
         print("\033[36m[*] 按 Ctrl+C 停止监控...\033[0m")
-        while True:
-            time.sleep(1)
+        # 使用事件来控制主循环
+        stop_event = threading.Event()
+        while not stop_event.is_set():
+            try:
+                stop_event.wait(1)
+            except KeyboardInterrupt:
+                break
     except KeyboardInterrupt:
         print("\033[36m[*] 接收到停止信号，正在停止...\033[0m")
+    except Exception as e:
+        print(f"\033[31m[!] 发生错误: {str(e)}\033[0m")
+        return 1
     finally:
-        watchdog.stop()
-    
+        if watchdog:
+            try:
+                watchdog.stop()
+            except Exception as e:
+                print(f"\033[31m[!] 停止监控时发生错误: {str(e)}\033[0m")
     return 0
 
 

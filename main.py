@@ -4,69 +4,26 @@ import os
 import subprocess
 import time
 import sys
+import signal
 from collections import defaultdict
 from UFWClient import UFWClient
 from fnmatch import fnmatch
 from DatabaseClient import DatabaseClient
 
-def load_config():
-    # 获取可执行文件所在目录
-    if getattr(sys, 'frozen', False):
-        # PyInstaller 打包后的路径
-        application_path = os.path.dirname(sys.executable)
-    else:
-        # 开发环境下的路径
-        application_path = os.path.dirname(os.path.abspath(__file__))
-    
-    config_path = os.path.join(application_path, 'config.yaml')
-    with open(config_path, 'r') as f:
-        return yaml.safe_load(f)
+# 修改导入部分
+from utils import extract_ip_and_path, match_paths, print_ban_info, load_config, tail_logs
 
-def tail_logs(log_paths, lines=1000):
-    log_data = []
-    for log_path in log_paths:
-        if os.path.isfile(log_path):
-            output = subprocess.run(['tail', '-n', str(lines), log_path], capture_output=True, text=True)
-            log_data.extend(output.stdout.strip().split("\n"))
-    return log_data
-
-def extract_ip_and_path(log_data):
-    pattern = re.compile(r'(\d+\.\d+\.\d+\.\d+).+?"(GET|POST|HEAD|PUT|DELETE)\s([^\s]+)')
-    extracted = [(m.group(1), m.group(3)) for m in pattern.finditer('\n'.join(log_data))]
-    return extracted
-
-def match_paths(entries, patterns):
-    matched = set()
-    for ip, path in entries:
-        for pattern in patterns:
-            # 处理正则表达式规则
-            if pattern.startswith('/^/'): 
-                try:
-                    # 移除前缀 /^/ 并编译正则表达式
-                    regex_pattern = pattern[3:]
-                    if re.match(regex_pattern, path):
-                        matched.add((ip, path, pattern))
-                except re.error:
-                    continue
-            # 处理普通的通配符规则
-            elif fnmatch(path, pattern):
-                matched.add((ip, path, pattern))
-    return matched
-
-def print_ban_info(ip: str, path: str, pattern: str) -> None:
-    """
-    以表格形式打印封禁信息
-    """
-    print("\033[32m+" + "="*50 + "+\033[0m")
-    print(f"\033[32m| IP地址: {ip:<42} |\033[0m")
-    print(f"\033[36m| 访问路径: {path:<40} |\033[0m")
-    print(f"\033[33m| 匹配规则: {pattern:<40} |\033[0m")
-    print("\033[32m+" + "="*50 + "+\033[0m")
+def signal_handler(signum, frame):
+    print("\n\033[33m[!] 程序被用户中断，正在退出...\033[0m")
+    sys.exit(0)
 
 def process_bans():
     """
     核心封禁处理流程
     """
+    # 注册信号处理器
+    signal.signal(signal.SIGINT, signal_handler)
+    
     config = load_config()
     db_client = DatabaseClient()
     ufw = UFWClient(db_client)
