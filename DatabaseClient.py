@@ -1,10 +1,17 @@
 import sqlite3
 import os
+import sys
 
 class DatabaseClient:
     def __init__(self, db_path='ban_address.db'):
-        script_dir = os.path.dirname(os.path.abspath(__file__))
-        self.db_path = os.path.join(script_dir, db_path)
+        if getattr(sys, 'frozen', False):
+            # PyInstaller 打包后的路径
+            application_path = os.path.dirname(sys.executable)
+        else:
+            # 开发环境下的路径
+            application_path = os.path.dirname(os.path.abspath(__file__))
+            
+        self.db_path = os.path.join(application_path, db_path)
         self._initialize_db()
     
     def _initialize_db(self):

@@ -9,10 +9,17 @@ from UFWClient import UFWClient
 from fnmatch import fnmatch
 from DatabaseClient import DatabaseClient
 
-def load_config(config_path='config.yaml'):
-    script_dir = os.path.dirname(os.path.abspath(__file__))
-    config_file = os.path.join(script_dir, config_path)
-    with open(config_file, 'r') as f:
+def load_config():
+    # 获取可执行文件所在目录
+    if getattr(sys, 'frozen', False):
+        # PyInstaller 打包后的路径
+        application_path = os.path.dirname(sys.executable)
+    else:
+        # 开发环境下的路径
+        application_path = os.path.dirname(os.path.abspath(__file__))
+    
+    config_path = os.path.join(application_path, 'config.yaml')
+    with open(config_path, 'r') as f:
         return yaml.safe_load(f)
 
 def tail_logs(log_paths, lines=1000):
